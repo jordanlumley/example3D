@@ -1,114 +1,139 @@
-// var config = {
-//     type: Phaser.CANVAS,
-//     width: window.innerWidth,
-//     height: window.innerHeight,
-//     backgroundColor: '#ffffff',
-//     scene: {
-//         preload: preload,
-//         create: create,
-//     }
-// };
+var SCREEN_WIDTH = window.innerWidth;
+var SCREEN_HEIGHT = window.innerHeight;
 
-// var game = new Phaser.Game(config);
+var controls;
+var camera, scene;
+var canvasRenderer, webglRenderer;
 
-// var anim;
-// var sprite;
+var container, mesh, geometry, plane;
 
-// function preload() {
-//     this.load.spritesheet('mummy', 'assets/runningStickFigure.png', { frameWidth: 75, frameHeight: 125 });
-// }
+var windowHalfX = window.innerWidth / 2;
+var windowHalfY = window.innerHeight / 2;
 
-// function create() {
-//     var config = {
-//         key: 'walk',
-//         frames: this.anims.generateFrameNumbers('mummy'),
-//         frameRate: 10,
-//         yoyo: false,
-//         repeat: -1
-//     };
+var group;
 
-//     anim = this.anims.create(config);
 
-//     sprite = this.add.sprite(400, 300, 'mummy').setScale(1);
+init();
+render();
 
-//     sprite.anims.load('walk');
+function init() {
+    container = document.createElement('div');
+    document.body.appendChild(container);
 
-//     //  Debug text
+    group = new THREE.Group();
 
-//     this.input.keyboard.on('keydown_SPACE', function (event) {
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
+    camera.position.x = 45;
+    camera.position.y = 25;
+    camera.position.z = 50;
 
-//         sprite.anims.play('walk');
 
-//     });
+    scene = new THREE.Scene();
 
-//     this.input.keyboard.on('keydown_P', function (event) {
+    // var groundMaterial = new THREE.MeshPhongMaterial({
+    //     color: 0x6C6C6C
+    // });
+    // plane = new THREE.Mesh(new THREE.PlaneGeometry(1500, 1500), groundMaterial);
+    // plane.rotation.x = -Math.PI / 2;
+    // plane.receiveShadow = true;
 
-//         if (sprite.anims.isPaused) {
-//             sprite.anims.resume();
-//         }
-//         else {
-//             sprite.anims.pause();
-//         }
+    scene.add(plane);
 
-//     });
+    // LIGHTS
+    scene.add(new THREE.AmbientLight(0x666666));
 
-//     this.input.keyboard.on('keydown_R', function (event) {
+    var light;
 
-//         sprite.anims.restart();
+    light = new THREE.DirectionalLight(0xdfebff, 1.75);
+    light.position.set(100, 200, 100);
+    light.position.multiplyScalar(1.3);
 
-//     });
+    light.castShadow = true;
+    light.shadowCameraVisible = true;
 
-// }
+    light.shadowMapWidth = 512;
+    light.shadowMapHeight = 512;
 
-var scene = new THREE.Scene();
-var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    var d = 200;
 
-scene.background = new THREE.Color('#FFFFF')
+    light.shadowCameraLeft = -d;
+    light.shadowCameraRight = d;
+    light.shadowCameraTop = d;
+    light.shadowCameraBottom = -d;
 
-var renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+    light.shadowCameraFar = 1000;
+    light.shadowDarkness = 0.2;
 
-camera.position.z = 200;
+    var helper = new THREE.DirectionalLightHelper(light, 5);
 
-var controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.campingFactor = 0.25;
-controls.enableZoom = true;
+    scene.add(light);
 
-var keyLight = new THREE.DirectionalLight(new THREE.Color('hsl(30, 100%, 75%)', 1.0));
-keyLight.position.set(-100, 0, 100);
+    var axesHelper = new THREE.AxesHelper(50);
 
-var fillLight = new THREE.DirectionalLight(new THREE.Color('hsl(240, 100%, 75%)', 0.75));
-fillLight.position.set(100, 0, 100);
+    var size = 100;
+    var divisions = 10;
+    var gridHelper = new THREE.GridHelper(size, divisions);
+    scene.add(gridHelper);
 
-var backLight = new THREE.DirectionalLight(new THREE.Color('hsl(30, 100%, 75%)', 1.0));
-backLight.position.set(100, 0, -100).normalize();
+    scene.add(axesHelper);
 
-scene.add(keyLight);
-scene.add(fillLight);
-scene.add(backLight);
+    // RENDERER
+    webglRenderer = new THREE.WebGLRenderer();
+    webglRenderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+    webglRenderer.domElement.style.position = "relative";
+    webglRenderer.shadowMapEnabled = true;
+    webglRenderer.shadowMapSoft = true;
 
-var loader = new THREE.GLTFLoader();
 
-loader.load('assets/mesh/dude.glb', function (gltf) {
+    container.appendChild(webglRenderer.domElement);
+    window.addEventListener('resize', onWindowResize, false);
+}
 
-    console.log(gltf)
+function onWindowResize() {
+    windowHalfX = window.innerWidth / 2;
+    windowHalfY = window.innerHeight / 2;
 
-    scene.add(gltf.scene);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
 
-}, undefined, function (error) {
+    webglRenderer.setSize(window.innerWidth, window.innerHeight);
+}
 
-    console.error(error);
+function render() {
+    requestAnimationFrame(render);
 
-});
+    camera.lookAt(scene.position);
+    webglRenderer.render(scene, camera);
+}
 
-var animate = function () {
-    requestAnimationFrame(animate);
+var createTask = function (i, task, taskShape) {
+    var loader = new THREE.GLTFLoader();
 
-    controls.update();
-
-    renderer.render(scene, camera);
+    loader.load('assets/glb/task.glb', function (gltf) {
+        gltf.scene.traverse(function (node) {
+            if (node instanceof THREE.Mesh) { node.castShadow = true; }
+        });
+        // bpmnShape[0].$.id
+        // gltf.scene.scale.set(.9, .9, .9)
+        gltf.scene.rotation.y = -150;
+        gltf.scene.position.x = taskShape[0]["omgdc:Bounds"][0].$.x / 25;
+        gltf.scene.position.z = taskShape[0]["omgdc:Bounds"][0].$.y / 25;
+        group.add(gltf.scene);
+    }, undefined, function (error) {
+        console.error(error);
+    });
 };
 
-animate();
+
+$.get('/getxml', function (resp) {
+    $.each(resp.definitions.process[0]["task"], function (i, task) {
+        var bpmnShape = resp.definitions["bpmndi:BPMNDiagram"][0]["bpmndi:BPMNPlane"][0]["bpmndi:BPMNShape"]
+        var taskShape = bpmnShape.filter(function (shape) {
+            return shape.$.bpmnElement == task.$.id
+        })
+
+        createTask(i, task, taskShape);
+    });
+    group.up.set(200, 200, 200);
+    scene.add(group);
+});
